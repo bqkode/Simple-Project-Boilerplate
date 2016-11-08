@@ -2,6 +2,8 @@ const   gulp         = require('gulp'),
         rename       = require('gulp-rename'),
         browserSync  = require('browser-sync'),
         stylus       = require('gulp-stylus'),
+        rupture      = require('rupture'),
+        autoprefixer = require('autoprefixer-stylus'),
         cleanCSS     = require('gulp-clean-css'),
         rimraf       = require('gulp-rimraf'),
         del          = require('del'),
@@ -18,7 +20,6 @@ const   gulp         = require('gulp'),
         babel        = require('babelify'),
         clear        = require('clear'),
         args         = require('yargs').argv,
-        autoprefixer = require('gulp-autoprefixer'),
         paths = {
                 src: 'src/',
                 dest: 'build/'
@@ -49,15 +50,19 @@ gulp.task('js', (callback) => {
     runSequence('clean', 'browserify', 'uglify', callback);
 });
 
-gulp.task('uglify', () =>
-    gulp.src(paths.dest + 'js/*.js')
+gulp.task('uglify', () => {
+
+    if (!args.isBuilding)
+        return;
+
+    return gulp.src(paths.dest + 'js/*.js')
         .pipe(sourcemaps.init())
         .pipe(uglify())
         .on('error', notifyError)
         .pipe(rename({suffix: '.min'}))
         .pipe(sourcemaps.write('.'))
         .pipe(gulp.dest(paths.dest + 'js'))
-);
+});
 
 
 
@@ -65,37 +70,33 @@ gulp.task('uglify', () =>
 
 gulp.task('styles', (callback) => {
     args.deletePaths = paths.dest + 'css/*.*';
-    runSequence('clean', 'stylus', 'autoprefix', 'minify-css', callback);
+    runSequence('clean', 'stylus', 'minify-css', callback);
 });
 
 gulp.task('stylus', () =>
     gulp.src(paths.src + 'styl/style.styl')
         .pipe(sourcemaps.init())
-        .pipe(stylus())
+        .pipe(stylus({
+            use: [rupture(), autoprefixer({ browsers: ['last 2 versions'], cascade: false })]
+        }))
         .on('error', notifyError)
         .pipe(rename({basename: 'styles'}))
         .pipe(gulp.dest(paths.dest + 'css/'))
 );
 
-gulp.task('autoprefix', () =>
-    gulp.src(paths.dest + 'css/*.css')
-        .pipe(autoprefixer({
-            browsers: ['last 2 versions'],
-            cascade: false
-        }))
-        .on('error', notifyError)
-        .pipe(gulp.dest(paths.dest + 'css/'))
-);
+gulp.task('minify-css', () => {
 
-gulp.task('minify-css', () =>
-  gulp.src(paths.dest + 'css/*.css')
+    if (!args.isBuilding)
+        return;
+
+    return gulp.src(paths.dest + 'css/*.css')
         .pipe(sourcemaps.init())
         .pipe(cleanCSS({compatibility: '*'}))
         .on('error', notifyError)
         .pipe(rename({suffix: '.min'}))
         .pipe(sourcemaps.write('.'))
         .pipe(gulp.dest(paths.dest + '/css'))
-);
+});
 
 
 /* Other tasks */
@@ -142,12 +143,17 @@ gulp.task('clean', () => {
 
 gulp.task('default', ['dev']);
 
-gulp.task('dev', ['setDev', 'build', 'browser-sync'], () => {
+gulp.task('dev', ['setDev', 'browser-sync'], (callback) => {
     args.isBuilding = false;
+
+    args.deletePaths = [paths.dest + 'css/*.*', paths.dest + 'js/*.*'];
+    runSequence('clean', 'styles', 'js', callback);
 
     gulp.watch('**/*.html', {cwd: paths.build}).on('change', browserSync.reload);
     gulp.watch('styl/**/*.styl', {cwd: paths.src}, ['styles']);
-    gulp.watch(['js/**/*.js'], {cwd: paths.src}, ['js']).on('change', browserSync.reload);
+
+    gulp.watch(['js/**/*.js'], {cwd: paths.src}, ['js']).on(['add', 'unlink'], browserSync.reload);
+    gulp.watch(['js/**/*.js'], {cwd: paths.dest}).on('change', browserSync.reload);
 });
 
 gulp.task('build', (callback) => {
