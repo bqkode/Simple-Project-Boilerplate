@@ -150,7 +150,7 @@ gulp.task('dev', ['setDev', 'browser-sync'], (callback) => {
     runSequence('clean', 'styles', 'js', callback);
 
     gulp.watch('**/*.html', {cwd: paths.build}).on('change', browserSync.reload);
-    gulp.watch('styl/**/*.styl', {cwd: paths.src}, ['styles']);
+    gulp.watch('styl/**/*.styl', {cwd: paths.src}, ['styles']).on(['add', 'unlink'], browserSync.reload);
 
     gulp.watch(['js/**/*.js'], {cwd: paths.src}, ['js']).on(['add', 'unlink'], browserSync.reload);
     gulp.watch(['js/**/*.js'], {cwd: paths.dest}).on('change', browserSync.reload);
